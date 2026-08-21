@@ -11,6 +11,7 @@ import {
   type WiState,
   type WorkItem,
 } from './domain/state-machine.js';
+import { buildEvent, filterEventsSince, shouldAppend, verbToKind } from './worker/events.js';
 
 const WI_ROUTES = new Set([
   '/host/:host/wis/:id/claim',
@@ -20,6 +21,8 @@ const WI_ROUTES = new Set([
   '/host/:host/wis/:id/mark-ready',
   '/host/:host/wis/:id/upsert',
 ]);
+
+const EVENTS_ROUTE = '/host/:host/events';
 
 function isWiRoute(path: string): boolean {
   return WI_ROUTES.has(path);
@@ -53,11 +56,18 @@ export class BookDO extends DurableObject {
     if (!match) return new Response('Not Found', { status: 404 });
 
     const { route, params } = match;
-    if (!isWiRoute(route.path)) return new Response('Not Implemented', { status: 501 });
 
     const host = params.host;
+    if (!host) return new Response('Not Found', { status: 404 });
+
+    if (route.path === EVENTS_ROUTE) {
+      return this.handleEvents(host, url);
+    }
+
+    if (!isWiRoute(route.path)) return new Response('Not Implemented', { status: 501 });
+
     const id = params.id;
-    if (!host || !id) return new Response('Not Found', { status: 404 });
+    if (!id) return new Response('Not Found', { status: 404 });
 
     let body: Record<string, unknown> = {};
     try {
@@ -68,6 +78,7 @@ export class BookDO extends DurableObject {
 
     const now = Date.now();
     let result: DomainResult;
+    let by: string | null = null;
 
     if (route.path.endsWith('/upsert')) {
       result = this.upsert(host, id, body);
@@ -81,7 +92,15 @@ export class BookDO extends DurableObject {
       return new Response(JSON.stringify({ error: result.code }), { status: 409 });
     }
 
+    const verb = route.path.split('/').pop() ?? '';
+    if (verb === 'claim' || verb === 'renew-lease' || verb === 'close') {
+      by = body.by === undefined ? null : String(body.by);
+    }
+
     this.persistWi(host, result.item);
+    if (shouldAppend(result.ok)) {
+      this.appendEvent(host, by, verb, now, result.item);
+    }
     if (result.item.leaseExpires !== null) {
       await this.scheduleAlarmIfSooner(result.item.leaseExpires);
     }
@@ -100,6 +119,9 @@ export class BookDO extends DurableObject {
       const result = expire(item, now);
       if (result.ok) {
         this.persistWi(row.host as string, result.item);
+        if (shouldAppend(result.ok)) {
+          this.appendEvent(row.host as string, null, 'expire', now, result.item);
+        }
       }
     }
 
@@ -189,6 +211,39 @@ export class BookDO extends DurableObject {
          payload = excluded.payload`,
       [item.id, host, item.state, item.assignee, item.leaseExpires, item.version, item.payload ?? null],
     );
+  }
+
+  private appendEvent(host: string, by: string | null, verb: string, ts: number, item: WorkItem): void {
+    const kind = verbToKind(verb);
+    if (!kind) return;
+    const event = buildEvent({ host, by, kind, ts, wiId: item.id, version: item.version });
+    this.sqlExec(
+      `INSERT INTO events (ts, host, by, kind, station, payload) VALUES (?, ?, ?, ?, ?, ?)`,
+      [event.ts, event.host, event.by, event.kind, event.station, event.payload],
+    );
+  }
+
+  private handleEvents(host: string, url: URL): Response {
+    const sinceParam = url.searchParams.get('since');
+    const since = sinceParam === null ? undefined : Number(sinceParam);
+    const rows = this.sqlExec(
+      `SELECT seq, ts, host, by, kind, station, payload FROM events WHERE host = ? ORDER BY seq ASC`,
+      [host],
+    );
+    const events = rows.map((row) => ({
+      seq: Number(row.seq),
+      ts: Number(row.ts),
+      host: String(row.host),
+      by: row.by === null || row.by === undefined ? null : String(row.by),
+      kind: String(row.kind),
+      station: row.station === null || row.station === undefined ? null : String(row.station),
+      payload: row.payload === null || row.payload === undefined ? null : String(row.payload),
+    }));
+    const filtered = filterEventsSince(events, since);
+    return new Response(JSON.stringify(filtered), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   private async scheduleAlarmIfSooner(leaseExpires: number): Promise<void> {

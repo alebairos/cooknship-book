@@ -8,7 +8,7 @@ export interface Env {
   BEARER_TOKEN: string;
 }
 
-const WI_ROUTE_PREFIX = '/host/:host/wis/';
+const HOST_ROUTE_PREFIX = '/host/:host/';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -30,7 +30,7 @@ export default {
       return new Response('cooknship-book', { status: 200 });
     }
 
-    if (match.route.path.startsWith(WI_ROUTE_PREFIX)) {
+    if (match.route.path.startsWith(HOST_ROUTE_PREFIX)) {
       const id = env.BOOK.idFromName(match.params.host);
       const stub = env.BOOK.get(id);
       return await stub.fetch(request);
