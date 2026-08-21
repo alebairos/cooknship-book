@@ -7,6 +7,7 @@ export type WorkItem = {
   leaseExpires: number | null;
   version: number;
   evidence?: string;
+  payload?: string;
 };
 
 export type DomainError = { ok: false; code: 'conflict' | 'cas' | 'illegal' };

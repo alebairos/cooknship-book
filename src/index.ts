@@ -8,6 +8,8 @@ export interface Env {
   BEARER_TOKEN: string;
 }
 
+const WI_ROUTE_PREFIX = '/host/:host/wis/';
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -26,6 +28,12 @@ export default {
 
     if (match.route.path === '/') {
       return new Response('cooknship-book', { status: 200 });
+    }
+
+    if (match.route.path.startsWith(WI_ROUTE_PREFIX)) {
+      const id = env.BOOK.idFromName(match.params.host);
+      const stub = env.BOOK.get(id);
+      return await stub.fetch(request);
     }
 
     return new Response('Not Implemented', { status: 501 });
