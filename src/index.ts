@@ -1,5 +1,6 @@
 import { bearerOk } from './auth.js';
 import { descriptorJson, matchRoute } from './routes.js';
+import observeHtml from './observe.html';
 
 export { BookDO } from './book-do.js';
 
@@ -27,7 +28,10 @@ export default {
     }
 
     if (match.route.path === '/') {
-      return new Response('cooknship-book', { status: 200 });
+      return new Response(observeHtml, {
+        status: 200,
+        headers: { 'Content-Type': 'text/html' },
+      });
     }
 
     if (match.route.path.startsWith(HOST_ROUTE_PREFIX)) {
