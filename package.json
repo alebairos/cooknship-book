@@ -1,0 +1,12 @@
+{
+  "name": "cooknship-book",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240815.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}
