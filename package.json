@@ -2,9 +2,11 @@
   "name": "cooknship-book",
   "type": "module",
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:pool": "vitest run --config vitest.pool.config.ts"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.6.16",
     "@cloudflare/workers-types": "^4.20240815.0",
     "typescript": "^5.5.4",
     "vitest": "^2.0.5"
