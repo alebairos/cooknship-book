@@ -3,12 +3,15 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
-    "test:pool": "vitest run --config vitest.pool.config.ts"
+    "test:pool": "vitest run --config vitest.pool.config.ts",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.6.16",
     "@cloudflare/workers-types": "^4.20240815.0",
+    "@playwright/test": "^1.47.0",
     "typescript": "^5.5.4",
-    "vitest": "^2.0.5"
+    "vitest": "^2.0.5",
+    "wrangler": "^3.72.0"
   }
 }
