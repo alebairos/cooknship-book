@@ -29,6 +29,10 @@ async function seedWorkItems(host: string): Promise<void> {
   await post(host, '/wis/wi-bar/expire', {});
 }
 
+function uniqueHost(): string {
+  return `acme-${test.info().workerIndex}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 async function setToken(page): Promise<void> {
   await page.addInitScript((token: string) => {
     localStorage.setItem('cooknship-book-token', token);
@@ -36,12 +40,15 @@ async function setToken(page): Promise<void> {
 }
 
 test('Observe page renders live events and descriptor footer', async ({ page }) => {
-  const host = 'acme';
+  const host = uniqueHost();
   await seedWorkItems(host);
   await setToken(page);
   await page.goto(`${BASE}/?host=${host}&pollMs=200`);
 
-  await expect(page.locator('#event-count')).toContainText('7 events · 2 tickets', { timeout: 5000 });
+  // seedWorkItems performs 7 posts for 2 distinct work items.
+  const expectedEvents = 7;
+  const expectedTickets = 2;
+  await expect(page.locator('#event-count')).toContainText(`${expectedEvents} events · ${expectedTickets} tickets`, { timeout: 5000 });
 
   const stations = page.locator('.station');
   await expect(stations).toHaveCount(5);
